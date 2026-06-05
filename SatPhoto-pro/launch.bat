@@ -2,7 +2,9 @@
 chcp 65001 >nul
 cd /d "%~dp0"
 
-set "SATPHOTO_ENV=%USERPROFILE%\anaconda\envs\satphoto"
+if not defined SATPHOTO_ENV set "SATPHOTO_ENV=%USERPROFILE%\.conda\envs\model"
+if not exist "%SATPHOTO_ENV%\python.exe" set "SATPHOTO_ENV=%USERPROFILE%\anaconda\envs\satphoto"
+if not exist "%SATPHOTO_ENV%\python.exe" set "SATPHOTO_ENV=%USERPROFILE%\anaconda3\envs\satphoto"
 set "PYTHONIOENCODING=utf-8"
 set "PYTHONUTF8=1"
 

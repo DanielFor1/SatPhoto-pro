@@ -59,6 +59,10 @@ class PipelineConfig:
     task4_method: str = "stereo_bm"
     task4_run_all: bool = False
     task5_stride: int = 2
+    task5_workers: int = 8
+    task5_intersection_method: str = "batch"
+    task5_use_gpu: bool = False
+    task5_chunk_size: int = 200000
     force: bool = False         # True 时即使已有产物也重算
     stages: tuple = ("rpc", "dom", "epipolar", "match", "dsm")
 
@@ -381,7 +385,11 @@ def _stage_dsm(cfg: PipelineConfig, epi: dict, match: dict, work: Path, log) -> 
             log(f"  无配套同名点，已从 BM 视差生成 {tie_csv}")
 
     cfg5 = Task5CloudConfig(
-        stride=cfg.task5_stride, workers=8, intersection_method="batch", chunk_size=200000,
+        stride=cfg.task5_stride,
+        workers=cfg.task5_workers,
+        intersection_method=cfg.task5_intersection_method,
+        use_gpu=cfg.task5_use_gpu,
+        chunk_size=cfg.task5_chunk_size,
         disp_path=match["disparity"], rpc_left=epi["left_rpb"], rpc_right=epi["right_rpb"],
         rgb_left=epi["left_epi"], tie_csv=tie_csv or "", grid_spec="",
         ref_dsm=cfg.ref_dsm, output_dir=str(out5),

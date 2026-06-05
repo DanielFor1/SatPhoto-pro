@@ -387,8 +387,8 @@ def run_task5_point_cloud(cfg: Task5CloudConfig | None = None) -> str:
     print(f"  有效视差像元: {mask.sum()}, 预计输出点: ~{est}")
 
     def progress(i: int, n: int) -> None:
-        if n > 0 and i % max(1, n // 20) == 0:
-            print(f"  进度: {i}/{n} ({100 * i / n:.1f}%)")
+        if n > 0:
+            print(f"  进度: {i}/{n} ({100 * i / n:.1f}%)", flush=True)
 
     t0 = time.time()
     result = disparity_to_cloud(

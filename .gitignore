@@ -27,6 +27,7 @@ __pycache__/
 *.pyo
 SatPhoto-pro/photogrammetry_suite/user_config.json
 suite_runtime.log
+.codegraph/
 ~$*
 
 # 例外：保留报告图件（PNG）

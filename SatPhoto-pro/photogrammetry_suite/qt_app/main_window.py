@@ -40,6 +40,9 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 _RUNTIME_LOG = _ROOT / "suite_runtime.log"
+_DEFAULT_TC = _ROOT.parent / "全流程测试用例"
+_DEFAULT_LEFT = "JAX_Tile_163_RGB_011"
+_DEFAULT_RIGHT = "JAX_Tile_163_RGB_007"
 
 from photogrammetry_suite.config import (
     SuiteConfig,
@@ -152,8 +155,9 @@ class SatPhotoProWindow(QMainWindow):
 
         self._build_statusbar()
         self._reset_session_state()
+        self._fill_pipeline_defaults(silent=True)
         self._select_module("pipeline")
-        self._append_log("SatPhoto-Pro 系统就绪。请先在左侧「浏览」导入所需文件。\n")
+        self._append_log("SatPhoto-Pro 系统就绪。全流程页已填入测试用例默认路径，可直接运行或手动替换。\n")
         self._append_log(f"当前输出目录: {self.cfg.output_root}\n")
         self._apply_ui_scale()
 
@@ -184,6 +188,41 @@ class SatPhotoProWindow(QMainWindow):
             self.log_console.clear()
         if hasattr(self, "canvas"):
             self.canvas.clear()
+
+    def _pipeline_default_paths(self) -> dict[str, str]:
+        tc = _DEFAULT_TC
+        truth = tc / "参考真值数据" / f"{_DEFAULT_LEFT}_vs_{_DEFAULT_RIGHT}"
+        return {
+            "tp_left": str(tc / f"{_DEFAULT_LEFT}.tif"),
+            "tp_right": str(tc / f"{_DEFAULT_RIGHT}.tif"),
+            "tp_lgcp": str(tc / f"{_DEFAULT_LEFT}_gcps_ellipsoid.csv"),
+            "tp_rgcp": str(tc / f"{_DEFAULT_RIGHT}_gcps_ellipsoid.csv"),
+            "tp_lchk": str(tc / f"{_DEFAULT_LEFT}_gcps_check.csv"),
+            "tp_rchk": str(tc / f"{_DEFAULT_RIGHT}_gcps_check.csv"),
+            "tp_base_dom": str(tc / "底图DOM" / "JAX_Tile_163_RGB_016_DOM.tif"),
+            "tp_ref_dom_l": str(tc / "参考真值数据" / "DOM" / f"{_DEFAULT_LEFT}_DOM.tif"),
+            "tp_ref_dom_r": str(tc / "参考真值数据" / "DOM" / f"{_DEFAULT_RIGHT}_DOM.tif"),
+            "tp_ref_dsm": str(truth / f"{_DEFAULT_LEFT}_vs_{_DEFAULT_RIGHT}_DSM.tif"),
+            "tp_ref_dsp": str(truth / f"{_DEFAULT_LEFT}_vs_{_DEFAULT_RIGHT}_DSP.tif"),
+            "tp_dem": "",
+            "tp_tie": "",
+        }
+
+    def _fill_pipeline_defaults(self, silent: bool = False) -> None:
+        missing: list[str] = []
+        for attr, value in self._pipeline_default_paths().items():
+            edit = getattr(self, attr, None)
+            if not isinstance(edit, QLineEdit):
+                continue
+            edit.setText(value)
+            if value and not Path(value).exists():
+                missing.append(value)
+        if missing:
+            self._append_log("测试用例默认路径中有文件不存在，请检查数据目录。\n")
+            if not silent:
+                QMessageBox.warning(self, "默认数据不完整", "部分默认测试用例文件不存在，请检查数据目录。")
+        elif not silent:
+            self._append_log("已填入测试用例默认数据路径。\n")
 
     def _apply_output_root(self, path: str) -> None:
         self.cfg.set_output_root(path)
@@ -336,6 +375,10 @@ class SatPhotoProWindow(QMainWindow):
             self.tp_ref_dsp = self._file_row(input_lay, "参考视差 DSP (可选)", kind="tiff")
             self.tp_dem = self._file_row(input_lay, "外部 DEM (可选)", kind="tiff")
             self.tp_tie = self._file_row(input_lay, "同名点 CSV (可选)")
+            fill_defaults = QPushButton("填入测试用例默认数据")
+            fill_defaults.setCursor(Qt.PointingHandCursor)
+            fill_defaults.clicked.connect(self._fill_pipeline_defaults)
+            input_lay.addWidget(fill_defaults)
             lay.addWidget(input_card)
             pg = self._param_group("全流程阶段", [])
             self.tp_stage_checks = {}
@@ -352,11 +395,38 @@ class SatPhotoProWindow(QMainWindow):
             self.tp_t4_method = QComboBox()
             self.tp_t4_method.addItems(["StereoBM (推荐)", "StereoSGBM", "Census", "Gray NCC", "CREStereo"])
             gl2.addWidget(self.tp_t4_method, 0, 1)
-            gl2.addWidget(QLabel("Task5 stride"), 1, 0)
+            gl2.addWidget(QLabel("Task5 后端"), 1, 0)
+            self.tp_t5_compute = QComboBox()
+            gpu_ok, gpu_msg = self._task5_gpu_status()
+            self.tp_t5_compute.addItems([
+                "CPU 批量 (batch，推荐)",
+                "CPU 多进程 (scipy)",
+                f"GPU (CUDA + CuPy){'' if gpu_ok else ' — 不可用'}",
+            ])
+            if not gpu_ok:
+                self.tp_t5_compute.model().item(2).setEnabled(False)
+            self.tp_t5_compute.setCurrentIndex(0)
+            gl2.addWidget(self.tp_t5_compute, 1, 1)
+            tp_gpu_hint = QLabel(f"GPU: {gpu_msg}" if gpu_ok else f"无 GPU: {gpu_msg}，请选 CPU")
+            tp_gpu_hint.setObjectName("MutedLabel")
+            tp_gpu_hint.setWordWrap(True)
+            pg.content_layout.addWidget(tp_gpu_hint)
+            gl2.addWidget(QLabel("Task5 stride"), 2, 0)
             self.tp_t5_stride = QSpinBox()
             self.tp_t5_stride.setRange(1, 8)
             self.tp_t5_stride.setValue(2)
-            gl2.addWidget(self.tp_t5_stride, 1, 1)
+            gl2.addWidget(self.tp_t5_stride, 2, 1)
+            gl2.addWidget(QLabel("Task5 workers"), 3, 0)
+            self.tp_t5_workers = QSpinBox()
+            self.tp_t5_workers.setRange(1, 32)
+            self.tp_t5_workers.setValue(self.cfg.task5.workers)
+            gl2.addWidget(self.tp_t5_workers, 3, 1)
+            gl2.addWidget(QLabel("Task5 chunk_size"), 4, 0)
+            self.tp_t5_chunk = QSpinBox()
+            self.tp_t5_chunk.setRange(10000, 500000)
+            self.tp_t5_chunk.setSingleStep(10000)
+            self.tp_t5_chunk.setValue(max(10000, self.cfg.task5.chunk_size))
+            gl2.addWidget(self.tp_t5_chunk, 4, 1)
             self.tp_t4_all = QCheckBox("Task4 运行全部 5 种算法")
             pg.content_layout.addWidget(self.tp_t4_all)
             self.tp_force = QCheckBox("强制重算（忽略已有产物）")
@@ -1075,6 +1145,13 @@ class SatPhotoProWindow(QMainWindow):
     def _job_pipeline(self) -> JobResult:
         from photogrammetry_suite.pipeline import PipelineConfig, run_full_pipeline
         method_map = {0: "stereo_bm", 1: "stereo_sgbm", 2: "census", 3: "gray_ncc", 4: "cres"}
+        task5_methods = ["batch", "scipy", "gpu"]
+        task5_idx = self.tp_t5_compute.currentIndex()
+        task5_use_gpu = task5_idx == 2
+        if task5_use_gpu:
+            ok, msg = self._task5_gpu_status()
+            if not ok:
+                raise RuntimeError(f"GPU 不可用: {msg}")
         stages = tuple(k for k, cb in self.tp_stage_checks.items() if cb.isChecked())
         cfg = PipelineConfig(
             left_image=self.tp_left.text().strip(),
@@ -1094,6 +1171,10 @@ class SatPhotoProWindow(QMainWindow):
             task4_method=method_map[self.tp_t4_method.currentIndex()],
             task4_run_all=self.tp_t4_all.isChecked(),
             task5_stride=self.tp_t5_stride.value(),
+            task5_workers=self.tp_t5_workers.value(),
+            task5_intersection_method=task5_methods[max(0, min(task5_idx, 2))],
+            task5_use_gpu=task5_use_gpu,
+            task5_chunk_size=self.tp_t5_chunk.value(),
             force=self.tp_force.isChecked(),
             stages=stages,
         )
