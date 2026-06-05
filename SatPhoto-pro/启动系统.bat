@@ -2,9 +2,7 @@
 chcp 65001 >nul
 cd /d "%~dp0"
 
-if not defined SATPHOTO_ENV set "SATPHOTO_ENV=%USERPROFILE%\.conda\envs\model"
-if not exist "%SATPHOTO_ENV%\python.exe" set "SATPHOTO_ENV=%USERPROFILE%\anaconda\envs\satphoto"
-if not exist "%SATPHOTO_ENV%\python.exe" set "SATPHOTO_ENV=%USERPROFILE%\anaconda3\envs\satphoto"
+set "SATPHOTO_ENV=%USERPROFILE%\anaconda\envs\satphoto"
 set "PYTHONIOENCODING=utf-8"
 set "PYTHONUTF8=1"
 set "QT_AUTO_SCREEN_SCALE_FACTOR=1"
@@ -40,6 +38,6 @@ if exist "%PY%" (
 
 echo Failed to start SatPhoto-Pro.
 echo Please create/install the environment first, then run this file again:
-echo   set SATPHOTO_ENV=path\to\your\conda\env
+echo   %USERPROFILE%\anaconda\envs\satphoto\python.exe
 pause
 exit /b 1
