@@ -113,7 +113,7 @@ class GridCanvas(QFrame):
                     else:
                         arr = arr[:, :, 0]
                 if arr.ndim == 2:
-                    arr = np.stack([arr, arr, arr], axis=-1)
+                    arr = GridCanvas._colorize_single_band(arr)
                 arr = np.ascontiguousarray(arr.astype(np.uint8))
                 h, w, ch = arr.shape
                 bytes_per_line = ch * w
@@ -122,6 +122,46 @@ class GridCanvas(QFrame):
         except Exception:
             return None
         return None
+
+    @staticmethod
+    def _colorize_single_band(arr: np.ndarray) -> np.ndarray:
+        data = arr.astype(np.float64, copy=False)
+        valid = np.isfinite(data)
+        if np.any(valid & (data < -10000)):
+            valid &= data > -10000
+        if not np.any(valid):
+            return np.zeros((*data.shape, 3), dtype=np.uint8)
+
+        vals = data[valid]
+        lo, hi = np.percentile(vals, [2, 98])
+        if not np.isfinite(lo) or not np.isfinite(hi) or hi <= lo:
+            lo, hi = float(vals.min()), float(vals.max())
+        if hi <= lo:
+            norm = np.zeros_like(data, dtype=np.float64)
+        else:
+            norm = np.clip((data - lo) / (hi - lo), 0.0, 1.0)
+        norm[~valid] = 0.0
+
+        stops = np.array([0.00, 0.15, 0.32, 0.50, 0.68, 0.84, 1.00], dtype=np.float64)
+        colors = np.array([
+            [35, 42, 86],
+            [39, 110, 142],
+            [40, 174, 128],
+            [132, 210, 82],
+            [236, 208, 77],
+            [229, 128, 54],
+            [158, 42, 75],
+        ], dtype=np.float64)
+
+        flat = norm.ravel()
+        idx = np.searchsorted(stops, flat, side="right") - 1
+        idx = np.clip(idx, 0, len(stops) - 2)
+        span = np.maximum(stops[idx + 1] - stops[idx], 1e-9)
+        t = ((flat - stops[idx]) / span)[:, None]
+        rgb = colors[idx] * (1.0 - t) + colors[idx + 1] * t
+        rgb = rgb.reshape((*data.shape, 3))
+        rgb[~valid] = [18, 22, 30]
+        return rgb.astype(np.uint8)
 
 
 class DualCanvasWidget(QWidget):
