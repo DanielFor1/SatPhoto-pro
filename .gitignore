@@ -1,0 +1,34 @@
+# ===== 课程数据（体积大，请按 README 第 5 节放置，不入库）=====
+全流程测试用例/
+卫星摄影测量-补充数据/
+实习数据/
+geoid_data/
+
+# ===== 栅格 / 点云 / 压缩包 =====
+*.tif
+*.tiff
+*.ovr
+*.aux.xml
+*.ply
+*.rar
+*.zip
+
+# ===== 运行输出 =====
+suite_outputs/
+SatPhoto-pro/suite_outputs/
+
+# ===== 大模型权重（CREStereo ONNX，单独获取）=====
+*.onnx
+SatPhoto-pro/ONNX-CREStereo-Depth-Estimation-main/
+
+# ===== Python 缓存 / 运行时 =====
+__pycache__/
+*.pyc
+*.pyo
+SatPhoto-pro/photogrammetry_suite/user_config.json
+suite_runtime.log
+~$*
+
+# 例外：保留报告图件（PNG）
+!报告/figs/
+!报告/figs/*.png

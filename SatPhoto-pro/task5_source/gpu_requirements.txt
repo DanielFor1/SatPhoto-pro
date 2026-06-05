@@ -1,0 +1,4 @@
+# Optional: GPU acceleration for RPC forward intersection.
+# Install the CuPy package matching your CUDA version, for example:
+#   pip install cupy-cuda12x
+# See https://docs.cupy.dev/en/stable/install.html for other CUDA versions.

@@ -1,0 +1,1 @@
+# SatPhoto-Pro Qt Application
